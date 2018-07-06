@@ -12,6 +12,7 @@
 - Vagrant 2.0+
 - Virtualbox 5.0 +
 - 提前下载kubernetes1.9.1以上版本的release压缩包
+- Mac/Linux，**不支持Windows**
 
 ## 集群
 
@@ -182,11 +183,50 @@ kubectl apply -f addon/istio/
 **运行示例**
 
 ```bash
-kubectl apply -f yaml/istio-bookinfo
 kubectl apply -n default -f <(istioctl kube-inject -f yaml/istio-bookinfo/bookinfo.yaml)
+istioctl create -f yaml/istio-bookinfo/bookinfo-gateway.yaml
 ```
 
+在您自己的本地主机的`/etc/hosts`文件中增加如下配置项。
+
+```
+172.17.8.102 grafana.istio.jimmysong.io
+172.17.8.102 servicegraph.istio.jimmysong.io
+```
+
+我们可以通过下面的URL地址访问以上的服务。
+
+| Service      | URL                                                          |
+| ------------ | ------------------------------------------------------------ |
+| grafana      | http://grafana.istio.jimmysong.io                            |
+| servicegraph | http://servicegraph.istio.jimmysong.io/dotviz>, <http://servicegraph.istio.jimmysong.io/graph>,http://servicegraph.istio.jimmysong.io/force/forcegraph.html |
+| tracing      | http://172.17.8.101:$JAEGER_PORT                             |
+| productpage  | http://172.17.8.101:$GATEWAY_PORT/productpage                |
+
+**注意**：`JAEGER_PORT`可以通过`kubectl -n istio-system get svc tracing -o jsonpath='{.spec.ports[0].nodePort}'`获取，`GATEWAY_PORT`可以通过`kubectl -n istio-system get svc istio-ingressgateway -o jsonpath='{.spec.ports[0].nodePort}'`获取。
+
 详细信息请参阅 https://istio.io/docs/guides/bookinfo.html
+
+### Vistio
+
+[Vizceral](https://github.com/Netflix/vizceral)是Netflix发布的一个开源项目，用于近乎实时地监控应用程序和集群之间的网络流量。Vistio是使用Vizceral对Istio和网格监控的改进。它利用Istio Mixer生成的指标，然后将其输入Prometheus。Vistio查询Prometheus并将数据存储在本地以允许重播流量。
+
+```bash
+# Deploy vistio via kubectl
+kubectl apply -f addon/vistio/
+
+# Expose vistio-api
+kubectl -n default port-forward $(kubectl -n default get pod -l app=vistio-api -o jsonpath='{.items[0].metadata.name}') 9091:9091 &
+
+# Expose vistio in another terminal window
+kubectl -n default port-forward $(kubectl -n default get pod -l app=vistio-web -o jsonpath='{.items[0].metadata.name}') 8080:8080 &
+```
+
+如果一切都已经启动并准备就绪，您就可以访问Vistio UI，开始探索服务网格网络，访问[http://localhost:8080](http://localhost:8080/) 您将会看到类似下图的输出。
+
+![vistio animation](images/vistio-animation.gif)
+
+更多详细内容请参考[Vistio—使用Netflix的Vizceral可视化Istio service mesh](https://servicemesher.github.io/blog/vistio-visualize-your-istio-mesh-using-netflixs-vizceral/)。
 
 ## 管理
 
